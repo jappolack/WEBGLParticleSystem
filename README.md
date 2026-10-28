@@ -21,9 +21,9 @@ Open [http://localhost:8000/particle.html](http://localhost:8000/particle.html).
 
 ## Effects
 
-- **Fire & Smoke**: a house chimney emits animated flame and smoke.
+- **Fire & Smoke**: flames spread from the chimney across the house, which collapses and rebuilds in a looping animation.
 - **Water & Liquids**: animated particles move inside a shallow pool.
 - **Weather**: rain streaks fall and create expanding puddle ripples on impact.
 - **Explosions & Sparks**: a cannon launches a ball with a smoke trail and particle burst on impact.
 - **Grass / Fur / Hair**: swaying grass surrounds a wandering, particle-furred sheep.
-- **Magic / Sci-Fi**: a mouse-following wand attracts orbiting particles and casts click-triggered bursts.
+- **Magic / Sci-Fi**: a mouse-following wand leaves a particle trail; click to scatter the particles and pull them back into the wand.

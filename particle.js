@@ -67,7 +67,214 @@ function createSoftParticleTexture()
     return new THREE.CanvasTexture(canvas);
 }
 
+function createFlameParticleTexture()
+{
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 96;
+
+    const context = canvas.getContext("2d");
+    const flameGradient = context.createLinearGradient(0, 4, 0, 96);
+    flameGradient.addColorStop(0, "rgba(255,255,255,0)");
+    flameGradient.addColorStop(0.18, "rgba(255,255,255,0.42)");
+    flameGradient.addColorStop(0.52, "rgba(255,255,255,0.86)");
+    flameGradient.addColorStop(0.82, "rgba(255,255,255,0.92)");
+    flameGradient.addColorStop(1, "rgba(255,255,255,0)");
+
+    context.beginPath();
+    context.moveTo(32, 95);
+    context.bezierCurveTo(10, 81, 11, 61, 23, 43);
+    context.bezierCurveTo(31, 31, 31, 20, 39, 5);
+    context.bezierCurveTo(43, 26, 60, 39, 55, 60);
+    context.bezierCurveTo(68, 79, 51, 92, 32, 95);
+    context.closePath();
+    context.fillStyle = flameGradient;
+    context.fill();
+
+    const coreGradient = context.createRadialGradient(32, 74, 2, 32, 70, 24);
+    coreGradient.addColorStop(0, "rgba(255,255,255,0.9)");
+    coreGradient.addColorStop(0.55, "rgba(255,255,255,0.42)");
+    coreGradient.addColorStop(1, "rgba(255,255,255,0)");
+    context.beginPath();
+    context.ellipse(32, 73, 11, 21, 0, 0, Math.PI * 2);
+    context.fillStyle = coreGradient;
+    context.fill();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+}
+
+function createWaterTextures()
+{
+    const size = 256;
+    const colorCanvas = document.createElement("canvas");
+    const normalCanvas = document.createElement("canvas");
+    colorCanvas.width = size;
+    colorCanvas.height = size;
+    normalCanvas.width = size;
+    normalCanvas.height = size;
+
+    const colorContext = colorCanvas.getContext("2d");
+    const normalContext = normalCanvas.getContext("2d");
+    const colorImage = colorContext.createImageData(size, size);
+    const normalImage = normalContext.createImageData(size, size);
+    const heights = new Float32Array(size * size);
+
+    for (let y = 0; y < size; y++)
+    {
+        const v = y / size * Math.PI * 2;
+        for (let x = 0; x < size; x++)
+        {
+            const u = x / size * Math.PI * 2;
+            const index = y * size + x;
+            const ripple = Math.sin(u * 3 + Math.sin(v * 2)) *
+                Math.cos(v * 5 - u * 2);
+            const fineRipples = Math.sin(u * 9 + v * 7) * 0.22 +
+                Math.sin(v * 13 - u * 4) * 0.12;
+            const height = ripple * 0.5 + fineRipples;
+            heights[index] = height;
+
+            const variation = Math.max(0, ripple * 0.5 + fineRipples + 0.22);
+            const grain = (
+                Math.sin(u * 37 + v * 53) * Math.sin(v * 41 - u * 29) + 1
+            ) * 2.5;
+            const pixelIndex = index * 4;
+            colorImage.data[pixelIndex] = 9 + variation * 24 + grain * 0.22;
+            colorImage.data[pixelIndex + 1] = 83 + variation * 75 + grain;
+            colorImage.data[pixelIndex + 2] = 103 + variation * 84 + grain;
+            colorImage.data[pixelIndex + 3] = 255;
+        }
+    }
+
+    for (let y = 0; y < size; y++)
+    {
+        for (let x = 0; x < size; x++)
+        {
+            const index = y * size + x;
+            const left = y * size + (x + size - 1) % size;
+            const right = y * size + (x + 1) % size;
+            const above = ((y + size - 1) % size) * size + x;
+            const below = ((y + 1) % size) * size + x;
+            const normalX = (heights[left] - heights[right]) * 2.4;
+            const normalY = (heights[above] - heights[below]) * 2.4;
+            const inverseLength = 1 / Math.hypot(normalX, normalY, 1);
+            const pixelIndex = index * 4;
+            normalImage.data[pixelIndex] = (normalX * inverseLength * 0.5 + 0.5) * 255;
+            normalImage.data[pixelIndex + 1] = (normalY * inverseLength * 0.5 + 0.5) * 255;
+            normalImage.data[pixelIndex + 2] = (inverseLength * 0.5 + 0.5) * 255;
+            normalImage.data[pixelIndex + 3] = 255;
+        }
+    }
+
+    colorContext.putImageData(colorImage, 0, 0);
+    normalContext.putImageData(normalImage, 0, 0);
+
+    const colorMap = new THREE.CanvasTexture(colorCanvas);
+    const normalMap = new THREE.CanvasTexture(normalCanvas);
+    for (const texture of [colorMap, normalMap])
+    {
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(2.5, 2);
+        texture.colorSpace = THREE.NoColorSpace;
+    }
+    colorMap.colorSpace = THREE.SRGBColorSpace;
+
+    return { colorMap, normalMap };
+}
+
+function createPoolTileTexture()
+{
+    const size = 256;
+    const tileCount = 8;
+    const tileSize = size / tileCount;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#b8c9c5";
+    context.fillRect(0, 0, size, size);
+
+    for (let row = 0; row < tileCount; row++)
+    {
+        for (let column = 0; column < tileCount; column++)
+        {
+            const variation = Math.floor(Math.random() * 14);
+            const red = 57 + variation;
+            const green = 127 + variation;
+            const blue = 139 + variation;
+            context.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+            context.fillRect(
+                column * tileSize + 2,
+                row * tileSize + 2,
+                tileSize - 4,
+                tileSize - 4
+            );
+            context.fillStyle = "rgba(255, 255, 255, 0.12)";
+            context.fillRect(
+                column * tileSize + 3,
+                row * tileSize + 3,
+                tileSize - 6,
+                2
+            );
+        }
+    }
+
+    const map = new THREE.CanvasTexture(canvas);
+    map.wrapS = THREE.RepeatWrapping;
+    map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(5, 4);
+    map.colorSpace = THREE.SRGBColorSpace;
+    return map;
+}
+
+function getFireParticleOrigin()
+{
+    const rebuildStart = FIRE_SPREAD_DURATION + FIRE_COLLAPSE_DURATION;
+    const spread = fireCycleAge < FIRE_SPREAD_DURATION
+        ? THREE.MathUtils.clamp(
+            (fireCycleAge - 1.2) / (FIRE_SPREAD_DURATION - 1.2),
+            0,
+            1
+        )
+        : fireCycleAge < rebuildStart
+            ? 1
+            : 1 - THREE.MathUtils.clamp(
+                (fireCycleAge - rebuildStart) / FIRE_REBUILD_DURATION,
+                0,
+                1
+            );
+
+    if (Math.random() > spread)
+    {
+        return {
+            x: FIRE_SOURCE.x + (Math.random() - 0.5) * 0.3,
+            y: FIRE_SOURCE.y - 0.18 + Math.random() * 0.2,
+            z: FIRE_SOURCE.z + (Math.random() - 0.5) * 0.3
+        };
+    }
+
+    if (Math.random() < 0.42)
+    {
+        return {
+            x: (Math.random() - 0.5) * 7.2,
+            y: -3.3 + Math.random() * 2.7,
+            z: 1.14 + Math.random() * 0.12
+        };
+    }
+
+    const roofX = (Math.random() - 0.5) * 3.8;
+    return {
+        x: roofX,
+        y: 0.55 + Math.random() * 0.55,
+        z: -2 + (roofX < 0 ? -1 : 1) * (2 - Math.abs(roofX) * 0.48)
+    };
+}
+
 const softParticleTexture = createSoftParticleTexture();
+const flameParticleTexture = createFlameParticleTexture();
 
 const RAIN_GROUND_Y = -4.5;
 const MAX_PUDDLES = 96;
@@ -92,6 +299,13 @@ const rippleGeometry = new THREE.RingGeometry(0.68, 0.8, 24);
 
 const FIRE_SOURCE = new THREE.Vector3(2.4, 2.75, -2);
 const house = new THREE.Group();
+const houseParts = [];
+const housePartCorner = new THREE.Vector3();
+let fireCycleAge = 0;
+const FIRE_SPREAD_DURATION = 7.5;
+const FIRE_COLLAPSE_DURATION = 3;
+const FIRE_REBUILD_DURATION = 4;
+const FIRE_CYCLE_DURATION = FIRE_SPREAD_DURATION + FIRE_COLLAPSE_DURATION + FIRE_REBUILD_DURATION;
 const houseGround = new THREE.Mesh(
     new THREE.PlaneGeometry(36, 32),
     new THREE.MeshStandardMaterial({ color: 0x20271e, roughness: 1 })
@@ -120,6 +334,13 @@ function addHousePart(geometry, material, x, y, z, rotationZ = 0)
     part.position.set(x, y, z);
     part.rotation.z = rotationZ;
     house.add(part);
+    houseParts.push({
+        mesh: part,
+        startPosition: part.position.clone(),
+        startRotation: part.rotation.clone(),
+        velocity: new THREE.Vector3(),
+        angularVelocity: new THREE.Vector3()
+    });
     return part;
 }
 
@@ -212,13 +433,20 @@ fireLight.position.copy(FIRE_SOURCE);
 scene.add(fireLight);
 
 const waterPool = new THREE.Group();
+const poolTileMap = createPoolTileTexture();
 const poolFloorMaterial = new THREE.MeshStandardMaterial({
-    color: 0x35565a,
-    roughness: 0.82
+    color: 0xd3e0dc,
+    map: poolTileMap,
+    roughness: 0.72
 });
 const poolWallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x718681,
-    roughness: 0.76
+    color: 0xe0e5df,
+    map: poolTileMap,
+    roughness: 0.7
+});
+const poolCopingMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb9c3bd,
+    roughness: 0.78
 });
 
 const poolFloor = new THREE.Mesh(
@@ -248,15 +476,41 @@ for (const x of [-9.25, 9.25])
     waterPool.add(wall);
 }
 
+function addPoolCoping(width, depth, x, z)
+{
+    const coping = new THREE.Mesh(
+        new THREE.BoxGeometry(width, 0.18, depth),
+        poolCopingMaterial
+    );
+    coping.position.set(x, 0.49, z);
+    waterPool.add(coping);
+}
+
+addPoolCoping(18.9, 0.78, 0, -7.25);
+addPoolCoping(18.9, 0.78, 0, 7.25);
+addPoolCoping(0.78, 13.8, -9.25, 0);
+addPoolCoping(0.78, 13.8, 9.25, 0);
+
+const poolLight = new THREE.DirectionalLight(0xe4f7ff, 1.8);
+poolLight.position.set(-5, 9, 7);
+poolLight.target.position.set(0, -0.4, 0);
+waterPool.add(poolLight, poolLight.target);
+
 const waterSurfaceGeometry = new THREE.PlaneGeometry(17, 13, 32, 24);
+const waterTextures = createWaterTextures();
 const waterSurface = new THREE.Mesh(
     waterSurfaceGeometry,
-    new THREE.MeshStandardMaterial({
-        color: 0x1689a2,
-        roughness: 0.24,
-        metalness: 0.16,
+    new THREE.MeshPhysicalMaterial({
+        color: 0xb5e3e8,
+        map: waterTextures.colorMap,
+        normalMap: waterTextures.normalMap,
+        normalScale: new THREE.Vector2(0.8, 0.8),
+        roughness: 0.12,
+        metalness: 0.05,
+        clearcoat: 0.9,
+        clearcoatRoughness: 0.08,
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.9,
         side: THREE.DoubleSide
     })
 );
@@ -350,9 +604,46 @@ const cannonImpactPosition = new THREE.Vector3(5, RAIN_GROUND_Y + 0.24, 0);
 let cannonballProgress = 0;
 let cannonCooldown = 0.4;
 let cannonballInFlight = false;
+let cannonFlashAge = 1;
 let explosionAge = 0;
 let explosionActive = false;
 let explosionVelocities = new Float32Array(0);
+
+const cannonFlash = new THREE.Group();
+cannonFlash.position.copy(cannonMuzzlePosition);
+cannonFlash.visible = false;
+cannonScene.add(cannonFlash);
+
+const cannonFlashOuterMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff4b0b,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+const cannonFlashInnerMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffdf75,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+const cannonFlashOuter = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 12),
+    cannonFlashOuterMaterial
+);
+cannonFlashOuter.scale.set(0.82, 0.32, 0.32);
+cannonFlash.add(cannonFlashOuter);
+const cannonFlashInner = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 12),
+    cannonFlashInnerMaterial
+);
+cannonFlashInner.position.x = 0.16;
+cannonFlashInner.scale.set(0.48, 0.2, 0.2);
+cannonFlash.add(cannonFlashInner);
+const cannonFlashLight = new THREE.PointLight(0xff6a20, 0, 5, 2);
+cannonFlashLight.position.copy(cannonMuzzlePosition);
+cannonScene.add(cannonFlashLight);
 
 const cannonSmokeCount = 72;
 const cannonSmokeAges = new Float32Array(cannonSmokeCount);
@@ -379,6 +670,7 @@ const cannonSmokeMaterial = new THREE.PointsMaterial({
     depthWrite: false,
     vertexColors: true
 });
+// PARTICLE SYSTEM: cannonball smoke trail.
 const cannonSmokeSystem = new THREE.Points(cannonSmokeGeometry, cannonSmokeMaterial);
 cannonSmokeSystem.visible = false;
 scene.add(cannonSmokeSystem);
@@ -548,6 +840,7 @@ const sheepFurMaterial = new THREE.LineBasicMaterial({
     transparent: true,
     opacity: 0.92
 });
+// PARTICLE SYSTEM: sheep coat / fur strands.
 const sheepFur = new THREE.LineSegments(sheepFurGeometry, sheepFurMaterial);
 sheep.add(sheepFur);
 
@@ -556,7 +849,17 @@ const magicPointerNdc = new THREE.Vector2();
 const magicPointerPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const magicPointer = new THREE.Vector3();
 let magicVelocities = new Float32Array(0);
-let magicBurstTimer = 0;
+let magicParticleAges = new Float32Array(0);
+let magicParticleLifetimes = new Float32Array(0);
+let magicEmissionCursor = 0;
+let magicEmissionTimer = 0;
+let magicBurstAge = -1;
+const magicPreviousWandPosition = new THREE.Vector3();
+const MAGIC_PALETTE = [
+    [0.18, 0.88, 1],
+    [0.78, 0.28, 1],
+    [1, 0.62, 0.24]
+];
 
 const magicWand = new THREE.Group();
 magicWand.visible = false;
@@ -633,13 +936,19 @@ let particleMaterial;
 let smokeSystem;
 let smokeGeometry;
 let smokeMaterial;
+let fireParticleAges = new Float32Array(0);
+let fireParticleLifetimes = new Float32Array(0);
+let fireParticleVelocities = new Float32Array(0);
+let fireSmokeAges = new Float32Array(0);
+let fireSmokeLifetimes = new Float32Array(0);
+let fireSmokeVelocities = new Float32Array(0);
 let grassBladePhases = new Float32Array(0);
 
 let particleCount = 2000;
 let currentEffect = "fire";
 
 // ======================================================
-// Create Particles
+// PARTICLE SYSTEM: create or rebuild particles for the selected effect.
 // ======================================================
 
 function createParticles(count)
@@ -661,6 +970,21 @@ function createParticles(count)
 
     particleGeometry = new THREE.BufferGeometry();
 
+    if (currentEffect === "fire")
+    {
+        fireParticleAges = new Float32Array(count);
+        fireParticleLifetimes = new Float32Array(count);
+        fireParticleVelocities = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++)
+        {
+            fireParticleLifetimes[i] = 0.65 + Math.random() * 0.65;
+            fireParticleAges[i] = Math.random() * fireParticleLifetimes[i];
+            fireParticleVelocities[i * 3] = (Math.random() - 0.5) * 0.7;
+            fireParticleVelocities[i * 3 + 1] = 1.9 + Math.random() * 1.8;
+            fireParticleVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.7;
+        }
+    }
+
     const positions = [];
     const colors = [];
 
@@ -674,14 +998,16 @@ function createParticles(count)
 
             case "fire":
 
-                x = FIRE_SOURCE.x + (Math.random() - 0.5) * 0.8;
-                y = FIRE_SOURCE.y - 0.35 + Math.random() * 1.1;
-                z = FIRE_SOURCE.z + (Math.random() - 0.5) * 0.8;
+                const fireProgress = fireParticleAges[i] / fireParticleLifetimes[i];
+                const fireOrigin = getFireParticleOrigin();
+                x = fireOrigin.x + (Math.random() - 0.5) * (0.2 + fireProgress * 0.8);
+                y = fireOrigin.y + fireProgress * (fireOrigin.y > 1 ? 2.5 : 2);
+                z = fireOrigin.z + (Math.random() - 0.5) * (0.2 + fireProgress * 0.8);
 
                 colors.push(
                     1,
-                    0.2 + Math.random() * 0.55,
-                    0.01
+                    0.9 - fireProgress * 0.78,
+                    0.34 * (1 - fireProgress)
                 );
 
                 break;
@@ -744,19 +1070,11 @@ function createParticles(count)
 
             case "magic":
 
-                const radius = 2.2 + Math.random() * 4.8;
-                const angle = Math.random() * Math.PI * 2;
-
-                x = magicPointer.x + Math.cos(angle) * radius;
-                y = magicPointer.y + Math.sin(angle) * radius;
-                z = (Math.random() - 0.5) * 1.6;
-
-                const magicPalette = [
-                    [0.18, 0.88, 1],
-                    [0.78, 0.28, 1],
-                    [1, 0.62, 0.24]
-                ];
-                colors.push(...magicPalette[i % magicPalette.length]);
+                const wandTip = getWandTipPosition();
+                x = wandTip.x + (Math.random() - 0.5) * 0.2;
+                y = wandTip.y + (Math.random() - 0.5) * 0.2;
+                z = wandTip.z + (Math.random() - 0.5) * 0.2;
+                colors.push(...MAGIC_PALETTE[i % MAGIC_PALETTE.length]);
 
                 break;
         }
@@ -810,6 +1128,7 @@ function createParticles(count)
                 transparent: true,
                 opacity: 0.94
             });
+        // PARTICLE SYSTEM: line-based rain streaks or grass blades.
         particleSystem = new THREE.LineSegments(
             particleGeometry,
             particleMaterial
@@ -818,14 +1137,15 @@ function createParticles(count)
     else
     {
         particleMaterial = new THREE.PointsMaterial({
-            size: currentEffect === "fire" ? 0.42 : currentEffect === "explosion" ? 0.24 : currentEffect === "magic" ? 0.2 : 0.15,
-            map: currentEffect === "fire" || currentEffect === "magic" ? softParticleTexture : null,
+            size: currentEffect === "fire" ? 0.58 : currentEffect === "explosion" ? 0.24 : currentEffect === "magic" ? 0.2 : 0.15,
+            map: currentEffect === "fire" ? flameParticleTexture : currentEffect === "magic" ? softParticleTexture : null,
             transparent: currentEffect === "fire" || currentEffect === "explosion" || currentEffect === "magic",
             opacity: currentEffect === "fire" ? 0.92 : 1,
             blending: currentEffect === "fire" || currentEffect === "explosion" || currentEffect === "magic" ? THREE.AdditiveBlending : THREE.NormalBlending,
             depthWrite: currentEffect !== "fire" && currentEffect !== "explosion",
             vertexColors: true
         });
+        // PARTICLE SYSTEM: point-based fire, water, explosion, or magic effect.
         particleSystem = new THREE.Points(
             particleGeometry,
             particleMaterial
@@ -854,12 +1174,28 @@ function createParticles(count)
         cannonSmokeAges.fill(-1);
         cannonSmokeColors.fill(0);
         cannonSmokeSystem.visible = false;
+        cannonFlash.visible = false;
+        cannonFlashAge = 1;
+        cannonFlashLight.intensity = 0;
     }
 
     if (currentEffect === "magic")
     {
         magicVelocities = new Float32Array(count * 3);
-        magicBurstTimer = 0;
+        magicParticleAges = new Float32Array(count);
+        magicParticleLifetimes = new Float32Array(count);
+        for (let i = 0; i < count; i++)
+        {
+            magicParticleLifetimes[i] = 1.2 + Math.random() * 1.2;
+            magicParticleAges[i] = Math.random() * magicParticleLifetimes[i];
+            magicVelocities[i * 3] = (Math.random() - 0.5) * 0.45;
+            magicVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.45;
+            magicVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.35;
+        }
+        magicEmissionCursor = 0;
+        magicEmissionTimer = 0;
+        magicBurstAge = -1;
+        magicPreviousWandPosition.copy(magicWand.position);
     }
 
     if (currentEffect === "fire")
@@ -867,16 +1203,24 @@ function createParticles(count)
         const smokeCount = Math.max(120, Math.floor(count * 0.18));
         const smokePositions = [];
         const smokeColors = [];
+        fireSmokeAges = new Float32Array(smokeCount);
+        fireSmokeLifetimes = new Float32Array(smokeCount);
+        fireSmokeVelocities = new Float32Array(smokeCount * 3);
 
         for (let i = 0; i < smokeCount; i++)
         {
+            fireSmokeLifetimes[i] = 2.4 + Math.random() * 1.8;
+            fireSmokeAges[i] = Math.random() * fireSmokeLifetimes[i];
+            fireSmokeVelocities[i * 3] = (Math.random() - 0.5) * 0.28;
+            fireSmokeVelocities[i * 3 + 1] = 0.55 + Math.random() * 0.55;
+            fireSmokeVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.28;
             smokePositions.push(
-                FIRE_SOURCE.x + (Math.random() - 0.5) * 0.65,
-                FIRE_SOURCE.y + Math.random() * 3,
-                FIRE_SOURCE.z + (Math.random() - 0.5) * 0.65
+                FIRE_SOURCE.x + fireSmokeVelocities[i * 3] * fireSmokeAges[i],
+                FIRE_SOURCE.y + 2.5 + fireSmokeAges[i] * fireSmokeVelocities[i * 3 + 1],
+                FIRE_SOURCE.z + fireSmokeVelocities[i * 3 + 2] * fireSmokeAges[i]
             );
 
-            const shade = 0.17 + Math.random() * 0.16;
+            const shade = 0.13 + Math.random() * 0.1;
             smokeColors.push(shade, shade * 1.02, shade * 1.08);
         }
 
@@ -890,18 +1234,21 @@ function createParticles(count)
             new THREE.Float32BufferAttribute(smokeColors, 3)
         );
         smokeMaterial = new THREE.PointsMaterial({
-            size: 0.9,
+            size: 1.15,
             map: softParticleTexture,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0.34,
+            blending: THREE.NormalBlending,
             depthWrite: false,
             vertexColors: true
         });
+        // PARTICLE SYSTEM: chimney smoke.
         smokeSystem = new THREE.Points(smokeGeometry, smokeMaterial);
         scene.add(smokeSystem);
     }
 }
 
+// PARTICLE SYSTEM CALL: initialize the default effect.
 createParticles(particleCount);
 
 // ======================================================
@@ -917,9 +1264,10 @@ document.getElementById("particleCount");
 const countDisplay =
 document.getElementById("countDisplay");
 
-effectDropdown.addEventListener("change", () =>
+function handleEffectChange()
 {
     currentEffect = effectDropdown.value;
+    // PARTICLE SYSTEM CALL: rebuild particle data for the newly selected effect.
     createParticles(particleCount);
     rainGround.visible = currentEffect === "weather";
     house.visible = currentEffect === "fire";
@@ -944,6 +1292,9 @@ effectDropdown.addEventListener("change", () =>
         explosionActive = false;
         cannonSmokeSystem.visible = false;
         cannonSmokeAges.fill(-1);
+        cannonFlash.visible = false;
+        cannonFlashAge = 1;
+        cannonFlashLight.intensity = 0;
     }
 
     if (currentEffect !== "weather")
@@ -955,17 +1306,17 @@ effectDropdown.addEventListener("change", () =>
             puddle.ripple.visible = false;
         }
     }
-});
+}
 
-window.addEventListener("pointermove", event =>
+function handlePointerMove(event)
 {
     magicPointerNdc.x = event.clientX / window.innerWidth * 2 - 1;
     magicPointerNdc.y = -(event.clientY / window.innerHeight) * 2 + 1;
     magicRaycaster.setFromCamera(magicPointerNdc, camera);
     magicRaycaster.ray.intersectPlane(magicPointerPlane, magicPointer);
-});
+}
 
-window.addEventListener("pointerdown", event =>
+function handlePointerDown(event)
 {
     if (currentEffect !== "magic" || event.button !== 0 || event.target.closest("#ui"))
     {
@@ -973,30 +1324,38 @@ window.addEventListener("pointerdown", event =>
     }
 
     const positions = particleGeometry.attributes.position.array;
+    const wandTip = getWandTipPosition();
     for (let i = 0; i < positions.length; i += 3)
     {
         const direction = new THREE.Vector3(
-            positions[i] - magicPointer.x,
-            positions[i + 1] - magicPointer.y,
-            positions[i + 2] * 0.4 + (Math.random() - 0.5) * 0.25
+            positions[i] - wandTip.x,
+            positions[i + 1] - wandTip.y,
+            positions[i + 2] - wandTip.z
         ).normalize();
         const speed = 3.5 + Math.random() * 6;
         magicVelocities[i] = direction.x * speed;
         magicVelocities[i + 1] = direction.y * speed;
         magicVelocities[i + 2] = direction.z * speed;
     }
-    magicBurstTimer = 0.42;
-});
+    magicBurstAge = 0;
+}
 
-particleSlider.addEventListener("input", () =>
+function handleParticleCountChange()
 {
     particleCount = Number(particleSlider.value);
-
-    countDisplay.textContent =
-    particleCount;
-
+    countDisplay.textContent = particleCount;
+    // PARTICLE SYSTEM CALL: rebuild particles at the requested density.
     createParticles(particleCount);
-});
+}
+
+function setupEventListeners()
+{
+    effectDropdown.addEventListener("change", handleEffectChange);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerdown", handlePointerDown);
+    particleSlider.addEventListener("input", handleParticleCountChange);
+    window.addEventListener("resize", handleResize);
+}
 
 // ======================================================
 // Animation
@@ -1008,6 +1367,12 @@ function launchCannonball()
 {
     cannonballProgress = 0;
     cannonballInFlight = true;
+    cannonFlashAge = 0;
+    cannonFlash.visible = true;
+    cannonFlash.scale.setScalar(1);
+    cannonFlashOuterMaterial.opacity = 0.95;
+    cannonFlashInnerMaterial.opacity = 1;
+    cannonFlashLight.intensity = 5;
     cannonSmokeAges.fill(-1);
     cannonSmokeColors.fill(0);
     cannonSmokeEmissionTimer = 0;
@@ -1015,6 +1380,29 @@ function launchCannonball()
     cannonball.visible = true;
     cannonSmokeSystem.visible = true;
     particleSystem.visible = false;
+}
+
+function updateCannonFlash(delta)
+{
+    if (!cannonFlash.visible)
+    {
+        return;
+    }
+
+    cannonFlashAge += delta;
+    const lifetime = 0.18;
+    if (cannonFlashAge >= lifetime)
+    {
+        cannonFlash.visible = false;
+        cannonFlashLight.intensity = 0;
+        return;
+    }
+
+    const fade = 1 - cannonFlashAge / lifetime;
+    cannonFlash.scale.setScalar(0.65 + fade * 0.55);
+    cannonFlashOuterMaterial.opacity = fade * 0.95;
+    cannonFlashInnerMaterial.opacity = fade;
+    cannonFlashLight.intensity = fade * 5;
 }
 
 function emitCannonSmoke()
@@ -1044,6 +1432,7 @@ function updateCannonSmoke(delta)
         while (cannonSmokeEmissionTimer >= 0.045)
         {
             cannonSmokeEmissionTimer -= 0.045;
+            // PARTICLE SYSTEM CALL: emit a cannon smoke particle.
             emitCannonSmoke();
         }
     }
@@ -1121,6 +1510,8 @@ function detonateCannonball()
 
 function updateCannon(delta)
 {
+    updateCannonFlash(delta);
+
     if (cannonballInFlight)
     {
         cannonballProgress = Math.min(1, cannonballProgress + delta / 1.5);
@@ -1135,6 +1526,7 @@ function updateCannon(delta)
         {
             cannonball.visible = false;
             cannonballInFlight = false;
+            // PARTICLE SYSTEM CALL: start the cannon impact burst.
             detonateCannonball();
             cannonCooldown = 2.5;
         }
@@ -1175,6 +1567,7 @@ function updateCannon(delta)
         cannonCooldown -= delta;
         if (cannonCooldown <= 0)
         {
+            // PARTICLE SYSTEM CALL: launch the next cannon shot.
             launchCannonball();
         }
     }
@@ -1265,13 +1658,587 @@ function updatePuddles(delta)
     }
 }
 
-function animate()
+function handleResize()
 {
-    requestAnimationFrame(animate);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
-    const delta = Math.min(clock.getDelta(), 0.05);
-    const elapsed = clock.elapsedTime;
+function resetHouse()
+{
+    house.position.set(0, 0, 0);
+    house.rotation.set(0, 0, 0);
+    for (const part of houseParts)
+    {
+        part.mesh.position.copy(part.startPosition);
+        part.mesh.rotation.copy(part.startRotation);
+        part.velocity.set(0, 0, 0);
+        part.angularVelocity.set(0, 0, 0);
+    }
 
+    for (const material of [
+        houseMaterials.wall,
+        houseMaterials.roof,
+        houseMaterials.chimney,
+        houseMaterials.foundation,
+        houseMaterials.door
+    ])
+    {
+        material.emissive.set(0x000000);
+        material.emissiveIntensity = 0;
+    }
+}
+
+function startHouseCollapse()
+{
+    for (const part of houseParts)
+    {
+        const outward = Math.sign(part.startPosition.x || (Math.random() - 0.5));
+        part.velocity.set(
+            outward * (0.5 + Math.random() * 1.4),
+            1.2 + Math.random() * 2.4,
+            (Math.random() - 0.5) * 2
+        );
+        part.angularVelocity.set(
+            (Math.random() - 0.5) * 3.2,
+            (Math.random() - 0.5) * 2.2,
+            outward * (0.6 + Math.random() * 2.4)
+        );
+    }
+}
+
+function getHousePartLowestY(part)
+{
+    if (!part.mesh.geometry.boundingBox)
+    {
+        part.mesh.geometry.computeBoundingBox();
+    }
+    const bounds = part.mesh.geometry.boundingBox;
+    let lowestY = Infinity;
+    for (const x of [bounds.min.x, bounds.max.x])
+    {
+        for (const y of [bounds.min.y, bounds.max.y])
+        {
+            for (const z of [bounds.min.z, bounds.max.z])
+            {
+                housePartCorner.set(x, y, z).applyEuler(part.mesh.rotation);
+                lowestY = Math.min(lowestY, housePartCorner.y);
+            }
+        }
+    }
+    return lowestY;
+}
+
+function updateHouseCycle(delta, elapsed)
+{
+    const previousPhase = fireCycleAge < FIRE_SPREAD_DURATION
+        ? "burning"
+        : fireCycleAge < FIRE_SPREAD_DURATION + FIRE_COLLAPSE_DURATION
+            ? "collapsing"
+            : "rebuilding";
+
+    fireCycleAge += delta;
+    if (fireCycleAge >= FIRE_CYCLE_DURATION)
+    {
+        fireCycleAge %= FIRE_CYCLE_DURATION;
+        resetHouse();
+    }
+
+    const collapseStart = FIRE_SPREAD_DURATION;
+    const rebuildStart = collapseStart + FIRE_COLLAPSE_DURATION;
+    const phase = fireCycleAge < collapseStart
+        ? "burning"
+        : fireCycleAge < rebuildStart
+            ? "collapsing"
+            : "rebuilding";
+
+    if (phase === "collapsing" && previousPhase !== "collapsing")
+    {
+        startHouseCollapse();
+    }
+
+    const burnAmount = THREE.MathUtils.clamp(
+        fireCycleAge / FIRE_SPREAD_DURATION,
+        0,
+        1
+    );
+    for (const material of [
+        houseMaterials.wall,
+        houseMaterials.roof,
+        houseMaterials.chimney,
+        houseMaterials.foundation,
+        houseMaterials.door
+    ])
+    {
+        material.emissive.setRGB(0.8, 0.12, 0.015);
+        material.emissiveIntensity = phase === "rebuilding"
+            ? (1 - (fireCycleAge - rebuildStart) / FIRE_REBUILD_DURATION) * 0.5
+            : burnAmount * 0.65;
+    }
+
+    if (phase === "burning")
+    {
+        const shake = burnAmount * 0.035;
+        house.position.set(
+            Math.sin(elapsed * 31) * shake,
+            Math.sin(elapsed * 37) * shake,
+            0
+        );
+    }
+    else if (phase === "collapsing")
+    {
+        house.position.set(
+            Math.sin(elapsed * 43) * 0.09,
+            Math.sin(elapsed * 47) * 0.04,
+            0
+        );
+
+        for (const part of houseParts)
+        {
+            part.velocity.y -= 5.2 * delta;
+            part.mesh.position.addScaledVector(part.velocity, delta);
+            part.mesh.rotation.x += part.angularVelocity.x * delta;
+            part.mesh.rotation.y += part.angularVelocity.y * delta;
+            part.mesh.rotation.z += part.angularVelocity.z * delta;
+
+            const lowestY = part.mesh.position.y + getHousePartLowestY(part);
+            if (lowestY < RAIN_GROUND_Y + 0.04)
+            {
+                part.mesh.position.y += RAIN_GROUND_Y + 0.04 - lowestY;
+                part.velocity.y = Math.max(0, part.velocity.y) * 0.12;
+                part.velocity.x *= 0.82;
+                part.velocity.z *= 0.82;
+                part.angularVelocity.multiplyScalar(0.72);
+            }
+        }
+    }
+    else
+    {
+        const rebuildProgress = THREE.MathUtils.clamp(
+            (fireCycleAge - rebuildStart) / FIRE_REBUILD_DURATION,
+            0,
+            1
+        );
+        house.position.set(0, 0, 0);
+        for (const part of houseParts)
+        {
+            part.mesh.position.lerp(part.startPosition, 1 - Math.exp(-delta * 1.8));
+            part.mesh.rotation.x = THREE.MathUtils.damp(
+                part.mesh.rotation.x,
+                part.startRotation.x,
+                1.8,
+                delta
+            );
+            part.mesh.rotation.y = THREE.MathUtils.damp(
+                part.mesh.rotation.y,
+                part.startRotation.y,
+                1.8,
+                delta
+            );
+            part.mesh.rotation.z = THREE.MathUtils.damp(
+                part.mesh.rotation.z,
+                part.startRotation.z,
+                1.8,
+                delta
+            );
+        }
+
+        if (rebuildProgress >= 1)
+        {
+            for (const part of houseParts)
+            {
+                part.mesh.position.copy(part.startPosition);
+                part.mesh.rotation.copy(part.startRotation);
+            }
+        }
+    }
+
+    const rebuildProgress = phase === "rebuilding"
+        ? THREE.MathUtils.clamp(
+            (fireCycleAge - rebuildStart) / FIRE_REBUILD_DURATION,
+            0,
+            1
+        )
+        : 0;
+    const phaseHeat = phase === "burning"
+        ? 7.5 + burnAmount * 3
+        : phase === "collapsing"
+            ? 8.5
+            : 6 * (1 - rebuildProgress);
+    fireLight.intensity = phaseHeat +
+        Math.sin(elapsed * 17) * Math.min(1.2, phaseHeat * 0.12) +
+        Math.random() * Math.min(0.8, phaseHeat * 0.08);
+}
+
+function updateFireEffect(positions, delta, elapsed)
+{
+    updateHouseCycle(delta, elapsed);
+
+    const colors = particleGeometry.attributes.color.array;
+    for (let i = 0; i < positions.length; i += 3)
+    {
+        const particleIndex = i / 3;
+        let age = fireParticleAges[particleIndex] + delta;
+        if (age >= fireParticleLifetimes[particleIndex])
+        {
+            age = 0;
+            fireParticleLifetimes[particleIndex] = 0.65 + Math.random() * 0.65;
+            fireParticleVelocities[i] = (Math.random() - 0.5) * 0.7;
+            fireParticleVelocities[i + 1] = 1.9 + Math.random() * 1.8;
+            fireParticleVelocities[i + 2] = (Math.random() - 0.5) * 0.7;
+            const origin = getFireParticleOrigin();
+            positions[i] = origin.x + (Math.random() - 0.5) * 0.24;
+            positions[i + 1] = origin.y + (Math.random() - 0.5) * 0.2;
+            positions[i + 2] = origin.z + (Math.random() - 0.5) * 0.24;
+        }
+
+        fireParticleAges[particleIndex] = age;
+        const progress = age / fireParticleLifetimes[particleIndex];
+        fireParticleVelocities[i] += Math.sin(elapsed * 8 + particleIndex * 0.31) * 0.55 * delta;
+        fireParticleVelocities[i + 2] += Math.cos(elapsed * 6 + particleIndex * 0.27) * 0.45 * delta;
+        positions[i] += (
+            fireParticleVelocities[i] + Math.sin(elapsed * 5 + particleIndex) * progress * 0.3
+        ) * delta;
+        positions[i + 1] += fireParticleVelocities[i + 1] * delta;
+        positions[i + 2] += (
+            fireParticleVelocities[i + 2] + Math.cos(elapsed * 4 + particleIndex) * progress * 0.25
+        ) * delta;
+
+        const flicker = 0.9 + Math.random() * 0.2;
+        colors[i] = 1;
+        if (progress < 0.22)
+        {
+            colors[i + 1] = (0.82 + Math.random() * 0.16) * flicker;
+            colors[i + 2] = 0.32 * flicker;
+        }
+        else
+        {
+            const cooling = (progress - 0.22) / 0.78;
+            colors[i] = (1 - cooling * 0.45) * flicker;
+            colors[i + 1] = (0.88 * (1 - cooling) + 0.08) * flicker;
+            colors[i + 2] = 0.3 * (1 - cooling);
+        }
+    }
+
+    particleGeometry.attributes.color.needsUpdate = true;
+
+    const smokePositions = smokeGeometry.attributes.position.array;
+    const smokeColors = smokeGeometry.attributes.color.array;
+    for (let i = 0; i < smokePositions.length; i += 3)
+    {
+        const smokeIndex = i / 3;
+        let age = fireSmokeAges[smokeIndex] + delta;
+        if (age >= fireSmokeLifetimes[smokeIndex])
+        {
+            age = 0;
+            fireSmokeLifetimes[smokeIndex] = 2.4 + Math.random() * 1.8;
+            fireSmokeVelocities[i] = (Math.random() - 0.5) * 0.28;
+            fireSmokeVelocities[i + 1] = 0.55 + Math.random() * 0.55;
+            fireSmokeVelocities[i + 2] = (Math.random() - 0.5) * 0.28;
+            smokePositions[i] = FIRE_SOURCE.x + (Math.random() - 0.5) * 0.45;
+            smokePositions[i + 1] = FIRE_SOURCE.y + 2.35 + Math.random() * 0.3;
+            smokePositions[i + 2] = FIRE_SOURCE.z + (Math.random() - 0.5) * 0.45;
+        }
+
+        fireSmokeAges[smokeIndex] = age;
+        const progress = age / fireSmokeLifetimes[smokeIndex];
+        const spread = 0.12 + progress * 0.48;
+        fireSmokeVelocities[i] += Math.sin(elapsed * 0.8 + smokeIndex) * 0.08 * delta;
+        fireSmokeVelocities[i + 2] += Math.cos(elapsed * 0.7 + smokeIndex) * 0.08 * delta;
+        smokePositions[i] += (
+            fireSmokeVelocities[i] + Math.sin(elapsed + smokeIndex) * spread * 0.16
+        ) * delta;
+        smokePositions[i + 1] += fireSmokeVelocities[i + 1] * delta;
+        smokePositions[i + 2] += (
+            fireSmokeVelocities[i + 2] + Math.cos(elapsed * 0.9 + smokeIndex) * spread * 0.12
+        ) * delta;
+
+        const fadeIn = THREE.MathUtils.clamp(progress / 0.12, 0, 1);
+        const fadeOut = THREE.MathUtils.clamp((1 - progress) / 0.24, 0, 1);
+        const shade = (0.22 + 0.05 * Math.sin(elapsed * 1.7 + smokeIndex)) * fadeIn * fadeOut;
+        smokeColors[i] = shade;
+        smokeColors[i + 1] = shade * 1.02;
+        smokeColors[i + 2] = shade * 1.08;
+    }
+
+    smokeGeometry.attributes.position.needsUpdate = true;
+    smokeGeometry.attributes.color.needsUpdate = true;
+}
+
+function updateGrassEffect(positions, delta, elapsed)
+{
+    if (sheepWalking)
+    {
+        const deltaX = sheepDestination.x - sheep.position.x;
+        const deltaZ = sheepDestination.z - sheep.position.z;
+        const distance = Math.hypot(deltaX, deltaZ);
+
+        if (distance < 0.28)
+        {
+            sheepWalking = false;
+            sheepPauseTimer = 1 + Math.random() * 2;
+        }
+        else
+        {
+            const targetYaw = Math.atan2(deltaX, deltaZ);
+            const turn = Math.atan2(
+                Math.sin(targetYaw - sheep.rotation.y),
+                Math.cos(targetYaw - sheep.rotation.y)
+            );
+            sheep.rotation.y += THREE.MathUtils.clamp(turn, -2.8 * delta, 2.8 * delta);
+
+            const walkSpeed = Math.min(1.15, distance * 1.4);
+            sheep.position.x += Math.sin(sheep.rotation.y) * walkSpeed * delta;
+            sheep.position.z += Math.cos(sheep.rotation.y) * walkSpeed * delta;
+            sheepGaitPhase += delta * 8.5;
+        }
+    }
+    else
+    {
+        sheepPauseTimer -= delta;
+        if (sheepPauseTimer <= 0)
+        {
+            chooseSheepDestination();
+        }
+    }
+
+    for (let i = 0, blade = 0; i < positions.length; i += 6, blade++)
+    {
+        const rootX = positions[i];
+        const rootZ = positions[i + 2];
+        const phase = grassBladePhases[blade];
+        positions[i + 3] = rootX + Math.sin(elapsed * 1.25 + phase) * 0.16;
+        positions[i + 5] = rootZ + Math.cos(elapsed * 1.05 + phase) * 0.1;
+    }
+
+    const furPositions = sheepFurGeometry.attributes.position.array;
+    for (let i = 0; i < furPositions.length; i += 6)
+    {
+        furPositions[i + 3] = furPositions[i] + Math.sin(elapsed * 1.6 + i) * 0.006;
+        furPositions[i + 5] = furPositions[i + 2] + Math.cos(elapsed * 1.3 + i) * 0.006;
+    }
+    sheepFurGeometry.attributes.position.needsUpdate = true;
+    sheep.position.y = GRASS_GROUND_Y + Math.sin(elapsed * 1.2) * 0.018 +
+        (sheepWalking ? Math.abs(Math.sin(sheepGaitPhase * 2)) * 0.035 : 0);
+
+    for (const legPivot of sheepLegPivots)
+    {
+        const gait = sheepWalking
+            ? Math.sin(sheepGaitPhase + legPivot.userData.gaitOffset) * 0.32
+            : 0;
+        legPivot.rotation.x = THREE.MathUtils.damp(
+            legPivot.rotation.x,
+            gait,
+            8,
+            delta
+        );
+    }
+}
+
+function getWandTipPosition()
+{
+    const tipOffset = 0.82;
+    return new THREE.Vector3(
+        magicWand.position.x - Math.sin(magicWand.rotation.z) * tipOffset,
+        magicWand.position.y + Math.cos(magicWand.rotation.z) * tipOffset,
+        magicWand.position.z
+    );
+}
+
+function emitMagicParticle(index, positions, wandVelocity)
+{
+    const arrayIndex = index * 3;
+    const wandTip = getWandTipPosition();
+    positions[arrayIndex] = wandTip.x + (Math.random() - 0.5) * 0.12;
+    positions[arrayIndex + 1] = wandTip.y + (Math.random() - 0.5) * 0.12;
+    positions[arrayIndex + 2] = wandTip.z + (Math.random() - 0.5) * 0.16;
+
+    magicVelocities[arrayIndex] = -wandVelocity.x * 0.85 + (Math.random() - 0.5) * 0.8;
+    magicVelocities[arrayIndex + 1] = -wandVelocity.y * 0.85 + (Math.random() - 0.5) * 0.8;
+    magicVelocities[arrayIndex + 2] = -wandVelocity.z * 0.55 + (Math.random() - 0.5) * 0.7;
+    magicParticleAges[index] = 0;
+    magicParticleLifetimes[index] = 1.2 + Math.random() * 1.2;
+}
+
+function updateMagicEffect(positions, delta, elapsed)
+{
+    magicWand.position.lerp(magicPointer, 1 - Math.exp(-delta * 18));
+    magicWand.position.z = 0.85;
+    magicWand.rotation.z = -0.42 + Math.sin(elapsed * 2.2) * 0.06;
+    wandCrystal.rotation.y += delta * 2.8;
+    wandCrystal.rotation.x = Math.sin(elapsed * 3.2) * 0.12;
+    magicPulse.position.set(magicPointer.x, magicPointer.y, 0.3);
+    magicPulse.scale.setScalar(0.85 + Math.sin(elapsed * 6) * 0.12);
+    magicPulse.material.opacity = 0.3 + Math.sin(elapsed * 6) * 0.12;
+
+    const wandVelocity = magicWand.position.clone()
+        .sub(magicPreviousWandPosition)
+        .divideScalar(Math.max(delta, 0.001))
+        .clampLength(0, 7);
+    magicPreviousWandPosition.copy(magicWand.position);
+
+    if (magicBurstAge < 0)
+    {
+        // PARTICLE SYSTEM CALL: emit the moving wand's trailing particles.
+        magicEmissionTimer += delta;
+        while (magicEmissionTimer >= 0.025)
+        {
+            magicEmissionTimer -= 0.025;
+            emitMagicParticle(magicEmissionCursor, positions, wandVelocity);
+            magicEmissionCursor = (magicEmissionCursor + 1) % magicParticleAges.length;
+        }
+    }
+
+    const wandTip = getWandTipPosition();
+    if (magicBurstAge >= 0)
+    {
+        magicBurstAge += delta;
+        if (magicBurstAge >= 1.45)
+        {
+            for (let i = 0; i < positions.length; i += 3)
+            {
+                positions[i] = wandTip.x;
+                positions[i + 1] = wandTip.y;
+                positions[i + 2] = wandTip.z;
+                magicVelocities[i] = 0;
+                magicVelocities[i + 1] = 0;
+                magicVelocities[i + 2] = 0;
+                magicParticleAges[i / 3] = 0;
+            }
+            magicBurstAge = -1;
+            magicEmissionTimer = 0;
+        }
+    }
+
+    for (let i = 0; i < positions.length; i += 3)
+    {
+        const particleIndex = i / 3;
+        const dx = wandTip.x - positions[i];
+        const dy = wandTip.y - positions[i + 1];
+        const dz = wandTip.z - positions[i + 2];
+        const distance = Math.max(0.001, Math.hypot(dx, dy, dz));
+        const colors = particleGeometry.attributes.color.array;
+
+        if (magicBurstAge >= 0)
+        {
+            if (magicBurstAge < 0.32)
+            {
+                const outwardForce = 7 / distance;
+                magicVelocities[i] -= dx * outwardForce * delta;
+                magicVelocities[i + 1] -= dy * outwardForce * delta;
+                magicVelocities[i + 2] -= dz * outwardForce * delta;
+            }
+            else
+            {
+                const returnForce = 30;
+                magicVelocities[i] += dx * returnForce * delta;
+                magicVelocities[i + 1] += dy * returnForce * delta;
+                magicVelocities[i + 2] += dz * returnForce * delta;
+            }
+
+            const burstDrag = Math.exp(-(magicBurstAge < 0.32 ? 0.18 : 1.8) * delta);
+            magicVelocities[i] *= burstDrag;
+            magicVelocities[i + 1] *= burstDrag;
+            magicVelocities[i + 2] *= burstDrag;
+            colors[i] = 0.8;
+            colors[i + 1] = 0.8;
+            colors[i + 2] = 0.8;
+        }
+        else
+        {
+            magicParticleAges[particleIndex] += delta;
+            if (magicParticleAges[particleIndex] >= magicParticleLifetimes[particleIndex])
+            {
+                emitMagicParticle(particleIndex, positions, wandVelocity);
+            }
+
+            const drift = Math.sin(elapsed * 2.5 + particleIndex) * 0.24;
+            magicVelocities[i] += drift * delta;
+            magicVelocities[i + 1] += 0.08 * delta;
+            const drag = Math.exp(-0.22 * delta);
+            magicVelocities[i] *= drag;
+            magicVelocities[i + 1] *= drag;
+            magicVelocities[i + 2] *= drag;
+
+            const fade = 1 - magicParticleAges[particleIndex] /
+                magicParticleLifetimes[particleIndex];
+            const palette = MAGIC_PALETTE[particleIndex % MAGIC_PALETTE.length];
+            colors[i] = palette[0] * fade;
+            colors[i + 1] = palette[1] * fade;
+            colors[i + 2] = palette[2] * fade;
+        }
+
+        if (magicBurstAge >= 0 && magicBurstAge >= 0.32 && distance < 0.14)
+        {
+            positions[i] = wandTip.x;
+            positions[i + 1] = wandTip.y;
+            positions[i + 2] = wandTip.z;
+            magicVelocities[i] = 0;
+            magicVelocities[i + 1] = 0;
+            magicVelocities[i + 2] = 0;
+            colors[i] = 0.8;
+            colors[i + 1] = 0.8;
+            colors[i + 2] = 0.8;
+        }
+        else
+        {
+            positions[i] += magicVelocities[i] * delta;
+            positions[i + 1] += magicVelocities[i + 1] * delta;
+            positions[i + 2] += magicVelocities[i + 2] * delta;
+        }
+    }
+    particleGeometry.attributes.color.needsUpdate = true;
+}
+
+function updateWaterEffect(positions, elapsed)
+{
+    waterTextures.colorMap.offset.set(elapsed * 0.012, elapsed * 0.007);
+    waterTextures.normalMap.offset.copy(waterTextures.colorMap.offset);
+
+    for (let i = 0; i < positions.length; i += 3)
+    {
+        positions[i + 1] = -0.2 + Math.sin(
+            elapsed * 1.5 +
+            positions[i] * 0.45 +
+            positions[i + 2] * 0.55
+        ) * 0.055;
+    }
+
+    const surfacePositions = waterSurface.geometry.attributes.position;
+    for (let i = 0; i < surfacePositions.count; i++)
+    {
+        const x = surfacePositions.getX(i);
+        const z = surfacePositions.getY(i);
+        surfacePositions.setZ(
+            i,
+            Math.sin(elapsed * 1.4 + x * 0.42 + z * 0.5) * 0.035 +
+            Math.cos(elapsed * 0.9 - x * 0.28 + z * 0.34) * 0.025
+        );
+    }
+    surfacePositions.needsUpdate = true;
+    waterSurface.geometry.computeVertexNormals();
+}
+
+function updateWeatherEffect(positions, delta)
+{
+    for (let i = 0; i < positions.length; i += 6)
+    {
+        positions[i + 1] -= 10 * delta;
+        positions[i + 4] -= 10 * delta;
+
+        if (positions[i + 1] <= RAIN_GROUND_Y)
+        {
+            // PARTICLE SYSTEM CALL: spawn a splash where a raindrop lands.
+            spawnPuddle(positions[i], positions[i + 2]);
+            positions[i + 1] = 15 + Math.random() * 10;
+            positions[i + 4] = positions[i + 1] - 0.9;
+        }
+    }
+}
+
+function updateEffect(delta, elapsed)
+{
     const positions =
     particleGeometry.attributes.position.array;
 
@@ -1280,120 +2247,29 @@ function animate()
         // FIRE & SMOKE
 
         case "fire":
-
-            for (let i = 0; i < positions.length; i += 3)
-            {
-                const height = positions[i + 1];
-                positions[i] += (Math.random() - 0.5) * (0.8 + height * 0.15) * delta;
-                positions[i + 2] += (Math.random() - 0.5) * 0.45 * delta;
-                positions[i + 1] += (1.3 + Math.random() * 1.7) * delta;
-
-                const heat = THREE.MathUtils.clamp(1 - height / 5, 0, 1);
-                const colors = particleGeometry.attributes.color.array;
-                colors[i] = 1;
-                colors[i + 1] = 0.12 + heat * 0.72;
-                colors[i + 2] = heat * 0.12;
-
-                if (positions[i + 1] > 5)
-                {
-                    positions[i] = FIRE_SOURCE.x + (Math.random() - 0.5) * 0.8;
-                    positions[i + 1] = FIRE_SOURCE.y - 0.35 + Math.random() * 0.5;
-                    positions[i + 2] = FIRE_SOURCE.z + (Math.random() - 0.5) * 0.8;
-                }
-            }
-
-            particleGeometry.attributes.color.needsUpdate = true;
-
-            const smokePositions = smokeGeometry.attributes.position.array;
-            const smokeColors = smokeGeometry.attributes.color.array;
-
-            for (let i = 0; i < smokePositions.length; i += 3)
-            {
-                const smokeHeight = smokePositions[i + 1] - FIRE_SOURCE.y;
-                const spread = 0.22 + Math.max(0, smokeHeight) * 0.08;
-                smokePositions[i] += (
-                    Math.sin(elapsed * 0.65 + i) * spread +
-                    (Math.random() - 0.5) * spread
-                ) * delta;
-                smokePositions[i + 1] += (0.45 + Math.random() * 0.45) * delta;
-                smokePositions[i + 2] += (
-                    Math.cos(elapsed * 0.5 + i) * spread * 0.6 +
-                    (Math.random() - 0.5) * spread * 0.7
-                ) * delta;
-
-                const density = 1 - THREE.MathUtils.clamp(smokeHeight / 10, 0, 1) * 0.72;
-                const shade = 0.3 * density;
-                smokeColors[i] = shade;
-                smokeColors[i + 1] = shade * 1.02;
-                smokeColors[i + 2] = shade * 1.08;
-
-                if (smokePositions[i + 1] > FIRE_SOURCE.y + 10)
-                {
-                    smokePositions[i] = FIRE_SOURCE.x + (Math.random() - 0.5) * 0.65;
-                    smokePositions[i + 1] = FIRE_SOURCE.y + Math.random() * 1.2;
-                    smokePositions[i + 2] = FIRE_SOURCE.z + (Math.random() - 0.5) * 0.65;
-                }
-            }
-
-            smokeGeometry.attributes.position.needsUpdate = true;
-            smokeGeometry.attributes.color.needsUpdate = true;
-            fireLight.intensity = 7.5 + Math.sin(elapsed * 17) * 1.2 + Math.random() * 0.8;
-
+            // PARTICLE SYSTEM CALL: advance chimney flames and smoke.
+            updateFireEffect(positions, delta, elapsed);
             break;
 
         // WATER
 
         case "water":
-
-            for (let i = 0; i < positions.length; i += 3)
-            {
-                positions[i + 1] =
-                -0.2 + Math.sin(
-                    elapsed * 1.5 +
-                    positions[i] * 0.45 +
-                    positions[i + 2] * 0.55
-                ) * 0.055;
-            }
-
-            const surfacePositions = waterSurface.geometry.attributes.position;
-            for (let i = 0; i < surfacePositions.count; i++)
-            {
-                const x = surfacePositions.getX(i);
-                const z = surfacePositions.getY(i);
-                surfacePositions.setZ(
-                    i,
-                    Math.sin(elapsed * 1.4 + x * 0.42 + z * 0.5) * 0.035 +
-                    Math.cos(elapsed * 0.9 - x * 0.28 + z * 0.34) * 0.025
-                );
-            }
-            surfacePositions.needsUpdate = true;
-            waterSurface.geometry.computeVertexNormals();
-
+            // PARTICLE SYSTEM CALL: animate water particles and the pool surface.
+            updateWaterEffect(positions, elapsed);
             break;
 
         // WEATHER
 
         case "weather":
-
-            for (let i = 0; i < positions.length; i += 6)
-            {
-                positions[i + 1] -= 10 * delta;
-                positions[i + 4] -= 10 * delta;
-
-                if (positions[i + 1] <= RAIN_GROUND_Y)
-                {
-                    spawnPuddle(positions[i], positions[i + 2]);
-                    positions[i + 1] = 15 + Math.random() * 10;
-                    positions[i + 4] = positions[i + 1] - 0.9;
-                }
-            }
-
+            // PARTICLE SYSTEM CALL: move rain streaks; puddle ripples update below.
+            updateWeatherEffect(positions, delta);
             break;
 
         // EXPLOSION
 
         case "explosion":
 
+            // PARTICLE SYSTEM CALL: update cannonball, blast, and smoke trail.
             updateCannon(delta);
             updateCannonSmoke(delta);
 
@@ -1402,128 +2278,33 @@ function animate()
         // GRASS / FUR
 
         case "grass":
-
-            if (sheepWalking)
-            {
-                const deltaX = sheepDestination.x - sheep.position.x;
-                const deltaZ = sheepDestination.z - sheep.position.z;
-                const distance = Math.hypot(deltaX, deltaZ);
-
-                if (distance < 0.28)
-                {
-                    sheepWalking = false;
-                    sheepPauseTimer = 1 + Math.random() * 2;
-                }
-                else
-                {
-                    const targetYaw = Math.atan2(deltaX, deltaZ);
-                    const turn = Math.atan2(
-                        Math.sin(targetYaw - sheep.rotation.y),
-                        Math.cos(targetYaw - sheep.rotation.y)
-                    );
-                    sheep.rotation.y += THREE.MathUtils.clamp(turn, -2.8 * delta, 2.8 * delta);
-
-                    const walkSpeed = Math.min(1.15, distance * 1.4);
-                    sheep.position.x += Math.sin(sheep.rotation.y) * walkSpeed * delta;
-                    sheep.position.z += Math.cos(sheep.rotation.y) * walkSpeed * delta;
-                    sheepGaitPhase += delta * 8.5;
-                }
-            }
-            else
-            {
-                sheepPauseTimer -= delta;
-                if (sheepPauseTimer <= 0)
-                {
-                    chooseSheepDestination();
-                }
-            }
-
-            for (let i = 0, blade = 0; i < positions.length; i += 6, blade++)
-            {
-                const rootX = positions[i];
-                const rootZ = positions[i + 2];
-                const phase = grassBladePhases[blade];
-                positions[i + 3] = rootX + Math.sin(elapsed * 1.25 + phase) * 0.16;
-                positions[i + 5] = rootZ + Math.cos(elapsed * 1.05 + phase) * 0.1;
-            }
-
-            const furPositions = sheepFurGeometry.attributes.position.array;
-            for (let i = 0; i < furPositions.length; i += 6)
-            {
-                furPositions[i + 3] = furPositions[i] + Math.sin(elapsed * 1.6 + i) * 0.006;
-                furPositions[i + 5] = furPositions[i + 2] + Math.cos(elapsed * 1.3 + i) * 0.006;
-            }
-            sheepFurGeometry.attributes.position.needsUpdate = true;
-            sheep.position.y = GRASS_GROUND_Y + Math.sin(elapsed * 1.2) * 0.018 +
-                (sheepWalking ? Math.abs(Math.sin(sheepGaitPhase * 2)) * 0.035 : 0);
-
-            for (const legPivot of sheepLegPivots)
-            {
-                const gait = sheepWalking
-                    ? Math.sin(sheepGaitPhase + legPivot.userData.gaitOffset) * 0.32
-                    : 0;
-                legPivot.rotation.x = THREE.MathUtils.damp(
-                    legPivot.rotation.x,
-                    gait,
-                    8,
-                    delta
-                );
-            }
-
+            // PARTICLE SYSTEM CALL: animate grass blades and sheep fur.
+            updateGrassEffect(positions, delta, elapsed);
             break;
 
         // MAGIC / SCI-FI
 
         case "magic":
-
-            magicWand.position.lerp(magicPointer, 1 - Math.exp(-delta * 18));
-            magicWand.position.z = 0.85;
-            magicWand.rotation.z = -0.42 + Math.sin(elapsed * 2.2) * 0.06;
-            wandCrystal.rotation.y += delta * 2.8;
-            wandCrystal.rotation.x = Math.sin(elapsed * 3.2) * 0.12;
-            magicPulse.position.set(magicPointer.x, magicPointer.y, 0.3);
-            magicPulse.scale.setScalar(0.85 + Math.sin(elapsed * 6) * 0.12);
-            magicPulse.material.opacity = 0.3 + Math.sin(elapsed * 6) * 0.12;
-
-            magicBurstTimer = Math.max(0, magicBurstTimer - delta);
-
-            for (let i = 0; i < positions.length; i += 3)
-            {
-                const dx = magicPointer.x - positions[i];
-                const dy = magicPointer.y - positions[i + 1];
-                const distance = Math.max(0.1, Math.hypot(dx, dy));
-                const inverseDistance = 1 / distance;
-                const pull = magicBurstTimer > 0 ? 0.12 : Math.min(7, distance * 1.8);
-                const swirl = magicBurstTimer > 0 ? 0.25 : 1.6;
-
-                magicVelocities[i] += (
-                    dx * inverseDistance * pull - dy * inverseDistance * swirl
-                ) * delta;
-                magicVelocities[i + 1] += (
-                    dy * inverseDistance * pull + dx * inverseDistance * swirl
-                ) * delta;
-                magicVelocities[i + 2] += (-positions[i + 2] * 1.8) * delta;
-
-                const drag = Math.exp(-1.05 * delta);
-                magicVelocities[i] *= drag;
-                magicVelocities[i + 1] *= drag;
-                magicVelocities[i + 2] *= drag;
-
-                positions[i] += magicVelocities[i] * delta;
-                positions[i + 1] += magicVelocities[i + 1] * delta;
-                positions[i + 2] += magicVelocities[i + 2] * delta;
-            }
-
+            // PARTICLE SYSTEM CALL: update wand trail and click burst/return.
+            updateMagicEffect(positions, delta, elapsed);
             break;
     }
 
     if (currentEffect === "weather")
     {
+        // PARTICLE SYSTEM CALL: animate active puddles and splash ripples.
         updatePuddles(delta);
     }
 
     particleGeometry.attributes.position.needsUpdate = true;
+}
 
+function animate()
+{
+    requestAnimationFrame(animate);
+
+    const delta = Math.min(clock.getDelta(), 0.05);
+    updateEffect(delta, clock.elapsedTime);
     controls.update();
 
     renderer.render(
@@ -1532,22 +2313,5 @@ function animate()
     );
 }
 
+setupEventListeners();
 animate();
-
-// ======================================================
-// Resize
-// ======================================================
-
-window.addEventListener("resize", () =>
-{
-    camera.aspect =
-    window.innerWidth /
-    window.innerHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-});
