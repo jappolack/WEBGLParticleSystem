@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Particle System Demo</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.179.1/examples/jsm/"
+        }
+    }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 6px;
+        }
+
+        label {
+            display: block;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h3>Particle System Demo</h3>
+        <label>
+            Effect Type:
+            <select id="effectType">
+                <option value="fire">Fire &amp; Smoke</option>
+                <option value="water">Water &amp; Liquids</option>
+                <option value="weather">Weather</option>
+                <option value="explosion">Explosions &amp; Sparks</option>
+                <option value="grass">Grass / Fur / Hair</option>
+                <option value="magic">Magic / Sci-Fi</option>
+            </select>
+        </label>
+        <label>
+            Particle Count:
+            <input type="range" id="particleCount" min="500" max="10000" value="2000" step="500">
+            <span id="countDisplay">2000</span>
+        </label>
+    </div>
+    <script type="module" src="particle.js"></script>
+</body>
+</html>
